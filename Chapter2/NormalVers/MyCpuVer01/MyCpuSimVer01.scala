@@ -1,0 +1,31 @@
+package mylib
+
+import spinal.core._
+import spinal.sim._
+import spinal.core.sim._
+
+//import scala.util.Random
+
+
+//MyTopLevel's testbench
+object MyTopLevelSim {
+  def main(args: Array[String]) {
+    SimConfig.withWave.doSim(new MyTopLevel){dut =>
+      //Fork a process to generate the reset and the clock on the dut
+      dut.clockDomain.forkStimulus(period = 10)
+      val source = new loadData
+      val patch = "C:\\Users\\ZLXT\\Desktop\\SpinalTemplateSbt-master\\src\\main\\scala\\mylib\\rom.data"
+      val romData = source.loadRomData(patch) 
+      
+      dut.clockDomain.waitRisingEdge()
+
+      for(idx <- romData){
+        //Wait a rising edge on the clock
+        dut.clockDomain.waitRisingEdge()
+        //Check that the dut values match with the reference model ones
+        assert(dut.io.inst.toLong == idx)
+        //Update the reference model value
+      }
+    }
+  }
+}
