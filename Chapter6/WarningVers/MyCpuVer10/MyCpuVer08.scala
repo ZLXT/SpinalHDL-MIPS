@@ -57,6 +57,7 @@ case class Cpu(instWidth:Int,addrWidth:Int) extends Component{
 
     val reg1Data = UInt(32 bits)
     val reg2Data = UInt(32 bits)
+
     //------------------------------------
     //数据前推
     val exWReg = UInt(1 bits)
@@ -68,6 +69,24 @@ case class Cpu(instWidth:Int,addrWidth:Int) extends Component{
 
     reg1Addr := flowReg1.instReg(MIPS.RS)
     reg2Addr := flowReg1.instReg(MIPS.RT)
+
+    //------------------------------------
+    //HILO模块返回值
+    val HIData = UInt(instWidth bits)
+    val LOData = UInt(instWidth bits)
+    //------------------------------------
+    //EX模块HILO相关信号输出
+    val wdHILO = UInt(1 bits)
+    val HI = UInt(instWidth bits)
+    val LO = UInt(instWidth bits)
+    //------------------------------------
+    //HILO数据前推
+    val exWdHILO = UInt(1 bits)
+    val exHI = UInt(instWidth bits)
+    val exLO = UInt(instWidth bits)
+    val memWdHILO = UInt(1 bits)
+    val memHI = UInt(instWidth bits)
+    val memLO = UInt(instWidth bits)
 
     //------------------------------------
     //switch中为寄存器赋值时，寄存器的值会在下一个时钟周期更新。为线类型赋值会立刻更新。
@@ -313,6 +332,18 @@ case class Cpu(instWidth:Int,addrWidth:Int) extends Component{
     }
 
     //------------------------------------
+    //数据前推选择，具有优先级
+    when(exWdHILO === 1){
+      HI := exHI
+      LO := exLO
+    }.elsewhen(memWdHILO === 1){
+      HI := memHI
+      LO := memLO
+    }.otherwise{
+      HI := HIData
+      LO := LOData
+    }
+    //------------------------------------
     //数据前推具有优先级
     when((reg1Read === 1) && (exWReg === 1) && (exWd === reg1Addr)){
       reg1 := exWData
@@ -349,6 +380,10 @@ case class Cpu(instWidth:Int,addrWidth:Int) extends Component{
     val reg2 = RegNext(ID.reg2)init(0)
     val wd = RegNext(ID.wd)init(0)
     val wReg = RegNext(ID.wReg)init(0)
+
+    val wdHILO = RegNext(ID.wdHILO)init(0)
+    val HI = RegNext(ID.HI)init(0)
+    val LO = RegNext(ID.LO)init(0)
   }
 
 //------------------------------------
@@ -361,40 +396,19 @@ case class Cpu(instWidth:Int,addrWidth:Int) extends Component{
     val wReg = flowReg2.wReg
     val wd = flowReg2.wd
     val wData = UInt(instWidth bits)
-    //------------------------------------
-    //HILO模块返回值
-    val HIData = UInt(instWidth bits)
-    val LOData = UInt(instWidth bits)
-    //------------------------------------
-    //EX模块HILO相关信号输出
-    val wdHILO = UInt(1 bits)
-    val HI = UInt(instWidth bits)
-    val LO = UInt(instWidth bits)
-    //------------------------------------
-    //HILO数据前推
-    val memWdHILO = UInt(1 bits)
-    val memHI = UInt(instWidth bits)
-    val memLO = UInt(instWidth bits)
-    val wbWdHILO = UInt(1 bits)
-    val wbHI = UInt(instWidth bits)
-    val wbLO = UInt(instWidth bits)
+
+    val wdHILO = flowReg2.wdHILO
+    val HI = flowReg2.HI
+    val LO = flowReg2.LO
+
+    ID.exWdHILO := wdHILO
+    ID.exHI := HI
+    ID.exLO := LO
 
     ID.exWd := wd
     ID.exWData := wData
     ID.exWReg := wReg
 
-    //------------------------------------
-    //数据前推选择，具有优先级
-    when(memWdHILO === 1){
-      HI := memHI
-      LO := memLO
-    }.elsewhen(wbWdHILO === 1){
-      HI := wbHI
-      LO := wbLO
-    }.otherwise{
-      HI := HIData
-      LO := LOData
-    }
     //------------------------------------
     //读HI/LO寄存器的指令
     switch(flowReg2.aluOp){
@@ -420,10 +434,8 @@ case class Cpu(instWidth:Int,addrWidth:Int) extends Component{
     when(flowReg2.aluOp === MIPS.MTHI_Op){
       wdHILO := 1
       HI := flowReg2.reg1
-      //LO := LO
     }.elsewhen(flowReg2.aluOp === MIPS.MTLO_Op){
       wdHILO := 1
-      //HI := HI
       LO := flowReg2.reg1
     }.otherwise{
       wdHILO := 0
@@ -503,9 +515,9 @@ case class Cpu(instWidth:Int,addrWidth:Int) extends Component{
     ID.memWReg := wReg
     ID.memWd := wd
 
-    EX.memWdHILO := wdHILO
-    EX.memHI := HI
-    EX.memLO := LO
+    ID.memWdHILO := wdHILO
+    ID.memHI := HI
+    ID.memLO := LO
   }
 //------------------------------------
 //四级流水线寄存器
@@ -518,9 +530,9 @@ case class Cpu(instWidth:Int,addrWidth:Int) extends Component{
     val HI = RegNext(MEM.HI)init(0)
     val LO = RegNext(MEM.LO)init(0)
 
-    EX.wbWdHILO := wdHILO
-    EX.wbHI := HI
-    EX.wbLO := LO        
+    //EX.wbWdHILO := wdHILO
+    //EX.wbHI := HI
+    //EX.wbLO := LO        
   }
 
 //------------------------------------
@@ -530,12 +542,14 @@ case class Cpu(instWidth:Int,addrWidth:Int) extends Component{
     val HIReg = Reg(UInt(32 bits))init(0)
     val LOReg = Reg(UInt(32 bits))init(0)
 
-    EX.HIData := HIReg
-    EX.LOData := LOReg
-
     when(flowReg4.wdHILO === 1){
       HIReg := flowReg4.HI
       LOReg := flowReg4.LO
+      ID.HIData := flowReg4.HI
+      ID.LOData := flowReg4.LO
+    }.otherwise{
+      ID.HIData := HIReg
+      ID.LOData := LOReg
     }
   }
 
