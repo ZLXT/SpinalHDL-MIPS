@@ -14,7 +14,7 @@ SpinalHDL入门时用来练习的项目比较少，我最近也在看《自己�
 
 ## 文件夹说明
 
-文件夹与《自己动手写CPU》[源码](https://zlxt.lanzous.com/iblobgd)中文件夹的名称对应。
+文件夹与《自己动手写CPU》[源码](https://zlxt.lanzoui.com/iblobgd)中文件夹的名称对应。
 
 其中NoramlVers存放的是调试正确的代码，仿真波形与书中的相同。
 
